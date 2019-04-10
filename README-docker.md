@@ -216,7 +216,6 @@ Successfully tagged webhook:v1
 ## Step3. 挂载本地代码进行调试
 
 errbot 调试配置
-
 ```bash
 docker run -d --name=errbot \
         --restart=always \
@@ -252,4 +251,3 @@ docker run -d --name=webhook -p 80:80 \
   -v $(pwd)/flask/flask-entry.py:/webhook/flask-entry.py \
   webhook:v1
 ```
-

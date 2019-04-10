@@ -13,7 +13,11 @@ WORKDIR /webhook
 COPY requirements.txt .
 RUN pip3 install --upgrade pip && pip3 install  --no-cache-dir -r ./requirements.txt
 
+<<<<<<< HEAD
 COPY githubutil ./githubutil/
+=======
+COPY githubutil .
+>>>>>>> a3717f10f754fcff5265415299590c51380e115a
 COPY config.yaml .
 COPY flask-entry.py .
 
