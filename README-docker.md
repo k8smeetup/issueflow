@@ -246,8 +246,26 @@ webhook 调试配置
 
 ```bash
 docker run -d --name=webhook -p 80:80 \
-  -v $(pwd)/githubutil:/webhook/githubutil \ # github 脚手架
-  -v $(pwd)/config/workflow.yaml:/webhook/config.yaml \ # 工作流配置
+        -e LOG_LEVEL=""
+        -e PORT="80"
+        -e GITHUB_TOKEN=""
+        -e WORKFLOW=""
+        -e ADMINS="markthink"
+        -v $(pwd)/githubutil:/webhook/githubutil \ # github 脚手架
+        -v $(pwd)/config/workflow.yaml:/webhook/config.yaml \ # 工作流配置
+        -v $(pwd)/flask/flask-entry.py:/webhook/flask-entry.py \
+        webhook:v1
+```
+
+```bash
+docker run -d -p 8000:80 \
+  -e LOG_LEVEL=""
+  -e PORT="80"
+  -e GITHUB_TOKEN=""
+  -e WORKFLOW=""
+  -e ADMINS="markthink"
+  -v $(pwd)/githubutil:/webhook/githubutil \
+  -v $(pwd)/config/workflow.yaml:/webhook/config.yaml \
   -v $(pwd)/flask/flask-entry.py:/webhook/flask-entry.py \
   webhook:v1
 ```
