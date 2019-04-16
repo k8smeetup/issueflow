@@ -13,6 +13,8 @@ class GitCommand:
 
     def __command_wrapper(self, command):
         cwd = os.getcwd()
+        if not os.path.exists(self.__repo_path):
+            os.mkdir(self.__repo_path)
         os.chdir(self.__repo_path)
         try:
             output = subprocess.check_output([self.__git_path] + command)
@@ -73,4 +75,8 @@ class GitCommand:
 
     def pull(self):
         command = ["pull"]
+        return self.__command_wrapper(command).strip()
+    
+    def checkout(self, target):
+        command = ["checkout",target]
         return self.__command_wrapper(command).strip()

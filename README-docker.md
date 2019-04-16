@@ -215,57 +215,125 @@ Successfully tagged webhook:v1
 
 ## Step3. 挂载本地代码进行调试
 
+### 
 errbot 调试配置
 ```bash
 docker run -d --name=errbot \
-        --restart=always \
-        -e BOT_LOG_LEVEL=INFO \ # 日志输出级别
-        -e BOT_ADMINS=@markthink \ # 管理员的 Slack 名称
-        -e REPOSITORY="kubernetes" \ # 配置文件中的 Repository 名称
-        -e REPOSITORY_CONFIG_FILE="/errbot/config/repository.yaml" \ # 配置文件名称
-        -e MAX_RESULT=10 \ # 单次最大输出数量
-        -e MAX_WRITE=30 \ # 单次最大写入数量
-        -e TARGET_LANG="zh" \ # 翻译语种名称
-        -e BOT_TOKEN="xoxb-" \ # Slack Bot 的 Token
-        -e BACKEND="Slack" \ # 指定使用 Slack 后端
-        -e CRITICAL_COMMANDS="find_new_files_in,find_updated_files_in,cache_issue" \ # 关键命令列表
-        -e OPERATORS="@markthink" \ # 可以执行关键命令的操作员
-        -e PRIVATE_COMMANDS="whatsnew,github_bind,github_whoami" \ # 仅能在私聊窗口中使用的命令
-        -v $(pwd)/gitutil:/errbot/plugins/transbot/gitutil \ # git 脚手架
-        -v $(pwd)/githubutil:/errbot/plugins/transbot/githubutil \ # github 脚手架
-        -v $(pwd)/transutil:/errbot/plugins/transbot/transutil \ # 翻译脚手架
-        -v $(pwd)/errbot-plugin/transbot/transbot.py:/errbot/plugins/transbot/transbot.py \ # 翻译助手
-        -v $(pwd)/errbot-plugin/config.py:/errbot/config.py \ # errbot 配置项
-        -v $(pwd)/data:/errbot/data \ # Bot 的存储路径
-        -v $(pwd)/config:/errbot/config \ # Bot 的配置路径
-        -v $(pwd)/repository:/errbot/repository \ # 代码库路径
-        errbot:v1 # 镜像名称
+  --restart=always \
+  -e BOT_LOG_LEVEL=INFO \ # 日志输出级别
+  -e BOT_ADMINS=@markthink \ # 管理员的 Slack 名称
+  -e REPOSITORY="kubernetes" \ # 配置文件中的 Repository 名称
+  -e REPOSITORY_CONFIG_FILE="/errbot/config/repository.yaml" \ # 配置文件名称
+  -e MAX_RESULT=10 \ # 单次最大输出数量
+  -e MAX_WRITE=30 \ # 单次最大写入数量
+  -e TARGET_LANG="zh" \ # 翻译语种名称
+  -e BOT_TOKEN="xoxb-" \ # Slack Bot 的 Token
+  -e BACKEND="Slack" \ # 指定使用 Slack 后端
+  -e CRITICAL_COMMANDS="find_new_files_in,find_updated_files_in,cache_issue" \ # 关键命令列表
+  -e OPERATORS="@markthink" \ # 可以执行关键命令的操作员
+  -e PRIVATE_COMMANDS="whatsnew,github_bind,github_whoami" \ # 仅能在私聊窗口中使用的命令
+  -v $(pwd)/gitutil:/errbot/plugins/transbot/gitutil \ # git 脚手架
+  -v $(pwd)/githubutil:/errbot/plugins/transbot/githubutil \ # github 脚手架
+  -v $(pwd)/transutil:/errbot/plugins/transbot/transutil \ # 翻译脚手架
+  -v $(pwd)/errbot-plugin/transbot/transbot.py:/errbot/plugins/transbot/transbot.py \ # 翻译助手
+  -v $(pwd)/errbot-plugin/config.py:/errbot/config.py \ # errbot 配置项
+  -v $(pwd)/data:/errbot/data \ # Bot 的存储路径
+  -v $(pwd)/config:/errbot/config \ # Bot 的配置路径
+  -v $(pwd)/repository:/errbot/repository \ # 代码库路径
+  -d errbot:v1 # 镜像名称
 ```
 
-webhook 调试配置
+errbot 命令列表:
+
+```bash
+# 在 Slack 中运行命令 `!help` 返回翻译助手支持的功能列表
+*TranslatorBot*
+_ChatBot for Kubernetes & Istio_
+• *!cache issue* - Save opening issues into a text file
+• *!comment issue* - usage: comment_issue [-h] [--comment COMMENT] issue_id
+• *!find dupe issues* - Find duplicated titles
+• *!find new files in* - usage: find_new_files_in [-h] [--create_issue CREATE_ISSUE] branch
+• *!find updated files in* - usage: find_updated_files_in [-h] [--create_issue CREATE_ISSUE] branch
+• *!github bind* - usage: github_bind [-h] token
+• *!github whoami* - (undocumented)
+• *!list branches* - List all branches in current repository
+• *!refresh repositories* - (undocumented)
+• *!search issues* - usage: search_issues [-h] query
+• *!show issue* - usage: show_issue [-h] issue_id
+• *!show limit* - (undocumented)
+• *!whatsnew* - Find issues with the label "welcome"
+```
+
+github api 测试
+
+```bash
+curl -i 'https://api.github.com/search/issues?q=grpc+label:version/1.12+state:open+repo:k8smeetup/website-tasks/'
+```
+
+#### webhook 配置
 
 ```bash
 docker run -d --name=webhook -p 80:80 \
-        -e LOG_LEVEL=""
-        -e PORT="80"
-        -e GITHUB_TOKEN=""
-        -e WORKFLOW=""
-        -e ADMINS="markthink"
-        -v $(pwd)/githubutil:/webhook/githubutil \ # github 脚手架
-        -v $(pwd)/config/workflow.yaml:/webhook/config.yaml \ # 工作流配置
-        -v $(pwd)/flask/flask-entry.py:/webhook/flask-entry.py \
-        webhook:v1
-```
-
-```bash
-docker run -d -p 8000:80 \
-  -e LOG_LEVEL=""
+  -e LOG_LEVEL=0
   -e PORT="80"
   -e GITHUB_TOKEN=""
-  -e WORKFLOW=""
+  -e WORKFLOW="kubernetes"
   -e ADMINS="markthink"
-  -v $(pwd)/githubutil:/webhook/githubutil \
-  -v $(pwd)/config/workflow.yaml:/webhook/config.yaml \
-  -v $(pwd)/flask/flask-entry.py:/webhook/flask-entry.py \
-  webhook:v1
+  -v $(pwd)/githubutil:/webhook/githubutil \ # github 脚手架
+  -v $(pwd)/config.yaml:/webhook/config.yaml \ # 工作流配置
+  -v $(pwd)/flask-entry.py:/webhook/flask-entry.py \
+  -d webhook:v1
 ```
+
+webhook 项目入口: `/postreceive`
+
+[入口代码](https://github.com/bloomberg/python-github-webhook/blob/e9a70dd3a907f5c1a8f4cee190c59e4e775af37f/github_webhook/webhook.py#L19)
+
+![](./2019-04-16-10-04-11.png)
+
+## 总结
+
+
+
+```bash
+# 服务器部署
+cd /oss/issueflow/errbot-plugin/errbot
+docker run -p 5678:5678 \
+  -e BOT_LOG_LEVEL=INFO \
+  -e BOT_ADMINS=@xiaolong \
+  -e REPOSITORY="kubernetes" \
+  -e REPOSITORY_CONFIG_FILE="/errbot/config/repository.yaml" \
+  -e MAX_RESULT=10 -e MAX_WRITE=5000 -e TARGET_LANG="zh" \
+  -e BOT_TOKEN="xoxb-xx" \
+  -e BACKEND="Slack" \
+  -e CRITICAL_COMMANDS="find_new_files_in,find_updated_files_in,cache_issue" \
+  -e OPERATORS=@xiaolong \
+  -e PRIVATE_COMMANDS="whatsnew,github_bind,github_whoami" \
+  -v $(pwd)/config.py:/errbot/config.py \
+  -v $(pwd)/plugins:/errbot/plugins \
+  -v $(pwd)/repository.yaml:/errbot/config/repository.yaml \
+  -v /root/website:/errbot/repository/website \
+  -v $(pwd)/data:/errbot/data \
+  -d errbot:v1
+  # /errbot/ python errbot
+
+# webhook 部署
+cd /oss/issueflow/flask/webhook
+docker run -p 8000:80 \
+  -p 9000:9000 \
+  -e LOG_LEVEL=0 \
+  -e PORT="80" \
+  -e GITHUB_TOKEN="xx" \
+  -e WORKFLOW="kubernetes" \
+  -e ADMINS="markthink" \
+  -v $(pwd)/githubutil:/webhook/githubutil \
+  -v $(pwd)/config.yaml:/webhook/config.yaml \
+  -v $(pwd)/flask-entry.py:/webhook/flask-entry.py \
+  -d webhook:v1
+  # /webhook/ python flask-entry.py
+```
+
+
+参考：[GitHub API 学习笔记 Search API](https://blog.csdn.net/Next_Second/article/details/78238328)
+
+

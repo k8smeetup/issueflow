@@ -10,7 +10,7 @@ from githubutil import action
 import logging.handlers
 
 MAX_LOG_BYTES = 1024 * 1024
-LOG_LEVEL = os.getenv('LOG_LEVEL',  str(logging.INFO))
+LOG_LEVEL = os.getenv('     ',  str(logging.INFO))
 PORT = os.getenv("PORT", "80")
 TOKEN = os.getenv('GITHUB_TOKEN', "")
 WORKFLOW = os.getenv('WORKFLOW', "")
@@ -77,6 +77,6 @@ def on_issue_comment(data):
         subject
     )
 
-
+# https://developer.github.com/webhooks/
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(PORT), debug=False)

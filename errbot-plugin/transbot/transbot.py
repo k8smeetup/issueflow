@@ -228,16 +228,20 @@ class TransBot(BotPlugin):
                                            issue_id, comment)
         return comment_obj.html_url
 
+    # http://errbot.io/en/latest/user_guide/plugin_development/botcommands.html
     @arg_botcmd('query', type=str)
     def search_issues(self, msg, query):
         """
         Search for issues.
-        :param query:
+        :param query: content
         :return: Issue list.
         """
+        # tmpstr = "{} label:version/1.12 is:open type:issue repo:{}".format(query, remote_repository_name())
+        tmpstr = "{} is:open type:issue repo:{}".format(
+            query, remote_repository_name())
         self._asset_bind(msg)
         client = self._github_operator(msg)
-        issue_list = client.search_issue(query, 10)
+        issue_list = client.search_issue(tmpstr, 10)
         return "\n".join(limit_result(
             ["{}: {}".format(i.number, i.title)
              for i in issue_list]
@@ -339,8 +343,9 @@ class TransBot(BotPlugin):
         branches = config.get_repository(REPOSITORY_NAME)["branches"]
         for branch in branches:
             cmd = GitCommand(branch["path"])
+            cmd.checkout(branch["value"])
             cmd.pull()
-            yield ("{} had been updated.".format((branch["path"])))
+            yield ("{} had been updated.".format((branch["value"])))
 
     # @arg_botcmd('repository', type=str)
     # @arg_botcmd('--count', type=int, default=10)

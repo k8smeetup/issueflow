@@ -50,7 +50,8 @@ class TranslateUtil:
     def _get_repo_path(self, repository_name, branch_name):
         self._configure.repository = repository_name
         branch_item = self._configure.get_branch(repository_name, branch_name)
-        return branch_item["path"]
+
+        return branch_item
 
     def __is_ignore(self, file_name, ignore_list):
         result = False
@@ -65,7 +66,7 @@ class TranslateUtil:
         result_list = [item for item in file_list if not self.__is_ignore(item, ignore_list)]
         return result_list
 
-    def _get_clean_files(self, repository, branch, path):
+    def _get_clean_files(self, repository, branch_path, path):
         """
         Get file list in specified path.
 
@@ -73,10 +74,7 @@ class TranslateUtil:
         :type path: str
         :rtype: list
         """
-
-        file_list = self._get_git_commander(
-            self._get_repo_path(repository, branch)
-        ).list_files()
+        file_list = self._get_git_commander(branch_path).list_files()
         file_list = self._filter_file_type(repository, file_list)
         path_sep = path.split(os.sep)
         result = [file_name[len(path):]
@@ -102,16 +100,22 @@ class TranslateUtil:
         :param language: Language name (in the configure file)
         :type language: str
         """
+
         target_path = self._configure.get_languages(
             repository_name, language)["path"]
         source_path = self._configure.get_source(
             repository_name)["path"]
+        # 切换指定分支
+        branch_item = self._get_repo_path(repository_name, branch_name)
+        branch_value = branch_item['value']
+        branch_path = branch_item['path']
+        self._get_git_commander(["checkout",branch_value])
 
         # List files in source/language path
         source_list = self._get_clean_files(repository_name,
-                                            branch_name, source_path)
+                                            branch_path, source_path)
         target_list = self._get_clean_files(repository_name,
-                                            branch_name, target_path)
+                                            branch_path, target_path)
 
         # return the different files list
         result = list(set(source_list) - set(target_list))
@@ -169,9 +173,13 @@ class TranslateUtil:
         :type language: str
         """
 
-        repository_path = self._configure.get_branch(repository_name,
-                                                     branch_name)["path"]
-        git_cmd = self._get_git_commander(repository_path)
+        # 切换指定分支
+        branch_item = self._get_repo_path(repository_name, branch_name)
+        branch_value = branch_item['value']
+        branch_path = branch_item['path']
+        self._get_git_commander(["checkout",branch_value])
+
+        git_cmd = self._get_git_commander(branch_path)
 
         target_path = self._configure.get_languages(repository_name,
                                                     language)["path"]
@@ -179,9 +187,9 @@ class TranslateUtil:
 
         # get files both in source and target.
         source_list = self._get_clean_files(repository_name,
-                                            branch_name, source_path)
+                                            branch_path, source_path)
         target_list = self._get_clean_files(repository_name,
-                                            branch_name, target_path)
+                                            branch_path, target_path)
         same_files = list(set(source_list) & set(target_list))
 
         result = {}
