@@ -273,7 +273,7 @@ curl -i 'https://api.github.com/search/issues?q=grpc+label:version/1.12+state:op
 #### webhook 配置
 
 ```bash
-docker run -d --name=webhook -p 80:80 \
+docker run --name=webhook -p 80:80 \
   -e LOG_LEVEL=0
   -e PORT="80"
   -e GITHUB_TOKEN=""
@@ -293,7 +293,10 @@ webhook 项目入口: `/postreceive`
 
 ## 总结
 
-
+1. 修复 issues 搜索指定,限制在当前仓库;
+2. 不同翻译分支使用同一个代码位置,通过 git 切换仓库实现, 原始各分支需要不同的文件夹实现; 
+3. 目前由于 github 搜索 api 限制数 30 条，不利于初始化 issue 后面会通过引入 PG 数据库解决;
+4. 更新 容器化部署文档, 方便部署测试.. '
 
 ```bash
 # 服务器部署

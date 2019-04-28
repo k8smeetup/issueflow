@@ -6,7 +6,6 @@ import re
 import time
 import logging
 
-
 class GithubOperator:
     _token = ""
     _client = None
@@ -51,10 +50,10 @@ class GithubOperator:
         result = []
         count = 0
         for issue in res:
-            if limit_interval > 0:
-                count += 1
-                if count % limit_interval == 0:
-                    self.check_limit(search_limit=limit_interval)
+            # if limit_interval > 0:
+            #     count += 1
+            #     if count % limit_interval == 0:
+            #         self.check_limit(search_limit=limit_interval)
             result.append(issue)
         return result
 
@@ -114,6 +113,37 @@ class GithubOperator:
         """
         issue = self.get_issue(repository_name, issue_id)
         return issue.create_comment(comment_body)
+
+    # https://github.com/sks444/Pygithub-Examples/blob/master/get_repositories_details.py
+    def pr_files(self, repository_name, pr_id):
+        repo = self._client.get_repo(repository_name)
+        pr = repo.get_pull(pr_id)
+        reviews = pr.get_reviews()
+        files = pr.get_files()
+
+        #Check if a PR is merged
+        is_merged = pr.is_merged()
+        pr_version = pr.base.ref
+
+        return {"reviews": reviews, "files": files, "is_merged": is_merged, "pr_version": pr_version}
+
+    # 获取用户信息
+    def get_user(self, author):
+        user = self._client.get_user(author)
+        return user
+    
+    # 创建文件
+    def create_file(self, repository_name, file_name, message, content):
+        repo = self._client.get_repo(repository_name)
+        
+        try:
+            file_info = repo.get_file_contents(file_name)
+            temp_file = repo.update_file(file_name, message,content,file_info.sha, branch='master')
+        except Exception as e:
+            temp_file = repo.create_file(file_name, message,content, branch='master')
+
+        return temp_file
+
 
 
 class GithubAction(GithubOperator):

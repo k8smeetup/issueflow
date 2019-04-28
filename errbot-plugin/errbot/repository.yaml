@@ -2,14 +2,23 @@ repositories:
   kubernetes:
     github:
       owner: k8smeetup
-      repository: test_tasks
-      # repository: website-tasks
+      repository: issue_tasks
+    k8s-official:
+      owner: k8smeetup
+      repository: k8s-official-translation
+    website:
+      owner: kubernetes
+      repository: website
+    pgdb:
+      conn: postgresql+psycopg2://
+      host: 192.168.0.110
+      db_name: website
+      db_user: k8smeetup
+      db_pass: caicloud.io
     valid_extensions:
     - ".md"
     - ".htm"
     - ".html"
-    labels:
-    - priority/P0
     branches:
     - name: "1.10"
       value: release-1.10

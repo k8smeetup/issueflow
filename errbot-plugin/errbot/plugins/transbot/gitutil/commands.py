@@ -80,3 +80,5 @@ class GitCommand:
     def checkout(self, target):
         command = ["checkout",target]
         return self.__command_wrapper(command).strip()
+
+    

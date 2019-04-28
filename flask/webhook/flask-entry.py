@@ -9,6 +9,10 @@ from githubutil import action
 
 import logging.handlers
 
+# import ptvsd
+# ptvsd.enable_attach(address =('0.0.0.0',9000))
+# ptvsd.wait_for_attach()
+
 MAX_LOG_BYTES = 1024 * 1024
 LOG_LEVEL = os.getenv('     ',  str(logging.INFO))
 PORT = os.getenv("PORT", "80")

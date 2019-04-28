@@ -200,3 +200,9 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 /errbot-plugin/repository/
+/errbot-plugin/errbot/github/
+/errbot-plugin/errbot/pgdata/
+/errbot-plugin/errbot/.idea/
+/errbot-plugin/errbot/data/
+/errbot-plugin/errbot/chart/
+/errbot-plugin/errbot/repository/website

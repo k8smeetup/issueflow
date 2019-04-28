@@ -85,7 +85,7 @@ workflow:
           label: translating
         failed_actions:
         - type: comment
-          value: "Sorry @%operator%, only 2 issues can be accepted by the same user."
+          value: "Sorry @%operator%, only 8 issues can be accepted by the same user."
       actions:
       - type: assign
         value: "%operator%"
@@ -129,7 +129,6 @@ workflow:
           group: status
           label: pushed
           mutex: True
-
     - name: "merged"
       description: "An PR for this issue had been merged."
       regex: \/merged

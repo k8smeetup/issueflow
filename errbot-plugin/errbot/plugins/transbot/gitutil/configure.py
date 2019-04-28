@@ -6,7 +6,6 @@ import yaml
 class Configuration:
     __configure_file = ""
     __configure_object = None
-    _current_repository_name = ""
 
     def __init__(self, configfile):
         with open(configfile, "r") as handler:
@@ -29,7 +28,6 @@ class Configuration:
 
     def list_branch(self, repository_name):
         """
-
         :rtype: list of str
         :param repository_name:
         :return: List of branch names.
@@ -69,3 +67,13 @@ class Configuration:
     def get_valid_extensions(self, repository_name):
         repo_data = self._get_repository(repository_name)
         return repo_data["valid_extensions"]
+
+    # postgresql+psycopg2://k8s:kubernetes@192.168.2.53/website
+    def get_conn(self, repository_name):
+        """
+        Return the database connection string
+        """
+        repo_data = self._get_repository(repository_name)
+        connstr = repo_data["pgdb"]
+        tmpstr = connstr["conn"]+connstr["db_user"]+":"+connstr["db_pass"]+"@"+connstr["host"]+"/"+connstr["db_name"]
+        return tmpstr

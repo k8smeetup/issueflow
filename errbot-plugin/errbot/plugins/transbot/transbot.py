@@ -8,76 +8,15 @@ from gitutil.commands import GitCommand
 from transutil.transutil import TranslateUtil
 from errbot import BotPlugin, botcmd, arg_botcmd
 
+import re,logging
+logger = logging.getLogger('k8smeetup')
+
 MAX_RESULT = int(os.getenv("MAX_RESULT"))
 MAX_WRITE = int(os.getenv("MAX_WRITE"))
 OPEN_CACHE = "/errbot/config/open_cache.txt"
 REPOSITORY_CONFIG_FILE = os.getenv("REPOSITORY_CONFIG_FILE")
 REPOSITORY_NAME = os.getenv("REPOSITORY")
 TARGET_LANG = os.getenv("TARGET_LANG")
-
-
-def build_issue(trans, branch, item_list):
-    trans.wait_for_limit(MAX_RESULT, MAX_RESULT)
-    if type(item_list) == dict:
-        file_list = list(item_list.keys())
-        type_label = "sync/update"
-        is_diff = True
-    else:
-        file_list = item_list
-        type_label = "sync/new"
-        is_diff = False
-
-    # Get default labels
-    new_labels = trans.get_default_label(
-        REPOSITORY_NAME, branch, TARGET_LANG)
-    new_labels.append(type_label)
-    search_labels = trans.get_search_label(
-        REPOSITORY_NAME, branch, TARGET_LANG)
-
-    # Create Issue for new files
-    new_count = 0
-    skip_count = 0
-    for file_name in file_list:
-        # Generate issue body
-        if is_diff:
-            diff = item_list[file_name]
-            body = "Source File: [{}]({})\nDiff:\n~~~diff\n {}\n~~~"
-            body = body.format(
-                file_name,
-                trans.gen_source_url(REPOSITORY_NAME, branch, file_name),
-                diff
-            )
-        else:
-            body = "Source File: [{}]({})"
-            body = body.format(
-                file_name,
-                trans.gen_source_url(REPOSITORY_NAME, branch, file_name),
-            )
-
-        # Search and create issue
-        new_issue = trans.create_issue(
-            remote_repository_name(),
-            file_name, body, new_labels, search_labels,
-            "", False
-        )
-        if new_issue is None:
-            skip_count += 1
-        else:
-            new_count += 1
-            if new_count >= MAX_WRITE:
-                break
-        if (new_count + skip_count) % MAX_RESULT:
-            trans.wait_for_limit(MAX_RESULT, MAX_RESULT)
-    return new_count, skip_count
-
-
-def remote_repository_name():
-    repo_config = RepoConfig(REPOSITORY_CONFIG_FILE)
-    repo_obj = repo_config.get_repository(REPOSITORY_NAME)
-    repo_owner = repo_obj["github"]["owner"]
-    repo_name = repo_obj["github"]["repository"]
-    return "{}/{}".format(repo_owner, repo_name)
-
 
 def limit_result(result_set):
     """
@@ -102,15 +41,17 @@ class TransBot(BotPlugin):
         assert self._github_bound(msg.frm.person), \
             "Bind your Github token please."
 
-    def _github_operator(self, msg):
+    def _github_bound(self, person):
         """
-        Get an Github Operator
-        :param msg:
-        :return: githubutil.github.GithubOperator
-        :rtype: githubutil.github.GithubOperator
+        Check if user had bound their github token.
+        :param person:
+        :rtype: bool
         """
-        token = self[msg.frm.person + "github_token"]
-        result = GithubOperator(token)
+        result = True
+        try:
+            result = len(self[person + "github_token"]) > 0
+        except:
+            result = False
         return result
 
     def _translation_util(self, msg):
@@ -120,47 +61,7 @@ class TransBot(BotPlugin):
         :rtype: TranslateUtil
         """
         token = self[msg.frm.person + "github_token"]
-        return TranslateUtil(REPOSITORY_CONFIG_FILE, token)
-
-    @botcmd
-    def list_branches(self, msg, args):
-        """
-        List all branches in current repository
-        :param msg:
-        :param args:
-        :return:
-        """
-        trans = self._translation_util(msg)
-        return "\n".join(trans.list_branches(REPOSITORY_NAME))
-
-    @botcmd
-    def find_dupe_issues(self, msg, args):
-        """
-        Find duplicated titles
-        :param msg:
-        :return:
-        """
-        github_client = self._github_operator(msg)
-        query = "repo:{} is:open type:issue".format(remote_repository_name())
-        issue_list = github_client.search_issue(query, MAX_RESULT)
-        tuple_list = [(issue.title, issue.number) for issue in issue_list]
-        tuple_list.sort()
-        count_list = {}
-        for title, number in tuple_list:
-            if title in count_list.keys():
-                count_list[title].append(number)
-            else:
-                count_list[title] = [number]
-        result = ""
-        count = 0
-        for title, number_list in count_list.items():
-            if len(number_list) == 1:
-                continue
-            result += "{} \n {}\n".format(
-                title, " ".join([str(i) for i in number_list]))
-            count += 1
-        result += "\n{} duplicated issues found.".format(count)
-        return result
+        return TranslateUtil(REPOSITORY_CONFIG_FILE, token, REPOSITORY_NAME, logger)
 
     @arg_botcmd('token', type=str)
     def github_bind(self, msg, token):
@@ -180,18 +81,22 @@ class TransBot(BotPlugin):
         except:
             yield ("**Bind your Github token please.**")
 
-    def _github_bound(self, person):
-        """
-        Check if user had bound their github token.
-        :param person:
-        :rtype: bool
-        """
-        result = True
-        try:
-            result = len(self[person + "github_token"]) > 0
-        except:
-            result = False
-        return result
+    @botcmd
+    def show_limit(self, msg, args):
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        limit = trans.show_limit()
+
+        core_pattern = "Core-Limit: {}\nCore-Remaining: {}\nCore-Reset: {}\n"
+        search_pattern = "Search-Limit: {}\nSearch-Remaining: {}\nSearch-Reset: {}\n"
+        return (core_pattern + search_pattern).format(
+            limit["core"]["limit"],
+            limit["core"]["remaining"],
+            limit["core"]["reset"],
+            limit["search"]["limit"],
+            limit["search"]["remaining"],
+            limit["search"]["reset"],
+        )
 
     @botcmd
     def whatsnew(self, msg, args):
@@ -202,32 +107,30 @@ class TransBot(BotPlugin):
         :return:
         """
         self._asset_bind(msg)
-        client = self._github_operator(msg)
-        cmd = "repo:{} label:welcome is:open type:issue".format(
-            remote_repository_name())
-        issue_list = client.search_issue(cmd, 10)
+        trans = self._translation_util(msg)
+        issue_list = trans.whatsnew(REPOSITORY_NAME)
+
         result = limit_result(
             ["{}: {}".format(i.number, i.title)
              for i in issue_list])
+
         return "\n".join(result)
 
-    @arg_botcmd('issue_id', type=int)
-    @arg_botcmd('--comment', type=str)
-    def comment_issue(self, msg, issue_id, comment):
+    @botcmd
+    def cache_issue(self, msg, args):
         """
-        Create comment for an issue
+        Save opening issues into a text file
         :param msg:
-        :param issue_id: Issue number
-        :type issue_id: int
-        :param comment: comment body
-        :return: HTML
+        :param args:
         """
         self._asset_bind(msg)
-        client = self._github_operator(msg)
-        comment_obj = client.issue_comment(remote_repository_name(),
-                                           issue_id, comment)
-        return comment_obj.html_url
-
+        trans = self._translation_util(msg)
+        query = "repo:{} is:open is:issue".format(
+            trans.remote_repository_name(REPOSITORY_NAME)
+        )
+        res = trans.cache_issues(query, OPEN_CACHE, MAX_RESULT)
+        return "{} records had been cached".format(res)
+                                 
     # http://errbot.io/en/latest/user_guide/plugin_development/botcommands.html
     @arg_botcmd('query', type=str)
     def search_issues(self, msg, query):
@@ -236,12 +139,11 @@ class TransBot(BotPlugin):
         :param query: content
         :return: Issue list.
         """
-        # tmpstr = "{} label:version/1.12 is:open type:issue repo:{}".format(query, remote_repository_name())
-        tmpstr = "{} is:open type:issue repo:{}".format(
-            query, remote_repository_name())
         self._asset_bind(msg)
-        client = self._github_operator(msg)
-        issue_list = client.search_issue(tmpstr, 10)
+        trans = self._translation_util(msg)
+
+        issue_list = trans.search_issues(REPOSITORY_NAME, query)
+
         return "\n".join(limit_result(
             ["{}: {}".format(i.number, i.title)
              for i in issue_list]
@@ -257,85 +159,181 @@ class TransBot(BotPlugin):
         :rtype: str
         """
         self._asset_bind(msg)
-        return "https://github.com/{}/issues/{}".format(remote_repository_name(),
-                                                        issue_id)
-
-    @botcmd
-    def cache_issue(self, msg, args):
-        """
-        Save opening issues into a text file
-        :param msg:
-        :param args:
-        """
-        self._asset_bind(msg)
         trans = self._translation_util(msg)
-        query = "repo:{} is:open type:issue".format(
-            remote_repository_name()
-        )
-        res = trans.cache_issues(query, OPEN_CACHE, MAX_RESULT)
-        return "{} records had been cached".format(res)
-
-    @arg_botcmd('branch', type=str)
-    @arg_botcmd('--create_issue', type=int, default=0)
-    def find_new_files_in(self, msg, branch, create_issue):
+        return "https://github.com/{}/issues/{}".format(trans.remote_repository_name(REPOSITORY_NAME),
+                                                        issue_id)     
+    # issue 查重
+    @botcmd
+    def find_dupe_issues(self, msg, args):
         """
-        Find new files from a branch for a language.
+        Find duplicated titles
+        :param msg:
+        :return:
+        """
+        trans = self._translation_util(msg)
+        issue_list = trans.find_open_issues(REPOSITORY_NAME, MAX_RESULT)
+ 
+        tuple_list = [(issue.title, issue.number) for issue in issue_list]
+        tuple_list.sort()
+        count_list = {}
+        for title, number in tuple_list:
+            if title in count_list.keys():
+                count_list[title].append(number)
+            else:
+                count_list[title] = [number]
+        result = ""
+        count = 0
+        for title, number_list in count_list.items():
+            if len(number_list) == 1:
+                continue
+            result += "{} \n {}\n".format(
+                title, " ".join([str(i) for i in number_list]))
+            count += 1
+        result += "\n{} duplicated issues found.".format(count)
+        return result
+
+    # 初始化 file 到数据库任务表 taskfiles
+    @botcmd
+    @arg_botcmd('branch', type=str)
+    def init_files(self, msg, branch):
+        """
+        Initialize the issue of the specified version into the database.
         :param msg:
         :param branch:
-        :param create_issue: if its value is
-        0 (default), will only show the new files.
-        else it will create new issue for them.
         :return:
         """
         self._asset_bind(msg)
         trans = self._translation_util(msg)
-        new_file_list = trans.find_new_files(
-            REPOSITORY_NAME, branch, TARGET_LANG)
-
-        if create_issue == 0:
-            yield ("\n".join(limit_result(new_file_list)))
-        else:
-            new_count, skip_count = build_issue(trans, branch, new_file_list)
-            yield ("{} Issues had been created. {} Issues had been skipped.".format(
+        new_count, skip_count = trans.init_files(REPOSITORY_NAME, branch, TARGET_LANG, True)
+        yield ("{} files had been created. {} files had been skipped.".format(
                 new_count, skip_count))
-            yield ("Please cache issues again.")
 
+    # 翻译文件对应的原始文档有更新, 更新数据到任务表 taskfiles
+    @botcmd
     @arg_botcmd('branch', type=str)
-    @arg_botcmd('--create_issue', type=int, default=0)
-    def find_updated_files_in(self, msg, branch, create_issue):
+    def update_files(self, msg, branch):
         """
-        Find updated files from a branch for a language.
-
+        Initialize the issue of the specified version into the database.
         :param msg:
         :param branch:
-        :param create_issue:
+        :return:
         """
         self._asset_bind(msg)
         trans = self._translation_util(msg)
-        updated_files = trans.find_updated_files(REPOSITORY_NAME, branch, TARGET_LANG)
+        _, update_count = trans.init_files(REPOSITORY_NAME, branch, TARGET_LANG, False)
+        yield ("{} files had been update. ".format(
+                update_count))
+
+    # 基于任务表 taskfiles 调用 github api 创建 issue
+    @botcmd
+    @arg_botcmd('branch', type=str)
+    @arg_botcmd('--create_issue', type=int, default=0)
+    def init_issue(self, msg, branch, create_issue):
+        """
+        Initialize the specified version of the issue.
+        :param msg:
+        :param branch:
+        :return:
+        """
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        status = 1 # tatus 待生成 issue 2.需要更新的 issue
+        issues = trans.init_issue_files(REPOSITORY_NAME, branch, TARGET_LANG, status, create_issue, MAX_WRITE, MAX_RESULT)
+        tuple_list = [(issue.files) for issue in issues]
+
         if create_issue == 0:
-            yield ("\n".join(limit_result(list(updated_files.keys()))))
+            yield ("\n".join(limit_result(tuple_list)))
         else:
-            new_count, skip_count = build_issue(trans, branch, updated_files)
-            yield ("{} Issues had been created. {} Issues had been skipped.".format(
-                new_count, skip_count))
-            yield ("Please cache issues again.")
+            yield ("{} Issues had been created.".format(len(tuple_list)))
+
+    # 基于任务表 taskfiles 调用 github api 更新 issue
+    @botcmd
+    @arg_botcmd('branch', type=str)
+    @arg_botcmd('--create_issue', type=int, default=0)
+    def update_issue(self, msg, branch,create_issue):
+        """
+        update the specified version of the issue.
+        :param msg:
+        :param branch:
+        :return:
+        """
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        status = 2 # tatus 待生成 issue 2.需要更新的 issue
+        issues = trans.init_issue_files(REPOSITORY_NAME, branch, 
+            TARGET_LANG, status, create_issue, MAX_WRITE, MAX_RESULT)
+
+        tuple_list = [(issue.files) for issue in issues]
+
+        if update_issue == 0:
+            yield ("\n".join(limit_result(tuple_list)))
+        else:
+            yield ("{} Issues had been updated.".format(len(tuple_list)))
+
+    @arg_botcmd('issue_id', type=int)
+    @arg_botcmd('--comment', type=str)
+    def comment_issue(self, msg, issue_id, comment):
+        """
+        Create comment for an issue
+        :param msg:
+        :param issue_id: Issue number
+        :type issue_id: int
+        :param comment: comment body
+        :return: HTML
+        """
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        comment_obj = trans.comment_issue(REPOSITORY_NAME, issue_id, comment)
+        return comment_obj.html_url
+    
+    @arg_botcmd('--comment', type=str)
+    def batch_comment_issue(self, msg, comment):
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        res = trans.batch_comment_issue(REPOSITORY_NAME, comment, MAX_RESULT)
+        return "{} records had been cached".format(res)
+
+    # 获取 kubernetes/website 所有的翻译 PR
+    @botcmd
+    def get_trans_pr(self,msg,args):
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        trans_pr = trans.get_trans_pr(REPOSITORY_NAME, MAX_RESULT)
+        yield("{} pr records had been create".format(trans_pr))
+        
+    # 获取 kubernetes/website 所有的翻译 files
+    @botcmd
+    def get_trans_files(self,msg,args):
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        trans_files = trans.get_trans_files(REPOSITORY_NAME, MAX_RESULT)
+        yield("{} pr file records had been create".format(trans_files))
+
+    # 每周报表更新
+    @botcmd
+    @arg_botcmd('branch', type=str)
+    def update_report(self, msg, branch):
+        """
+        update the specified version of the report.
+        :param msg:
+        :param branch:
+        :return:
+        """
+        self._asset_bind(msg)
+        trans = self._translation_util(msg)
+        result = trans.report_update(REPOSITORY_NAME, branch, MAX_RESULT)
+        yield("已完成周报更新！")
 
     @botcmd
-    def show_limit(self, msg, args):
-        self._asset_bind(msg)
-        util = self._github_operator(msg)
-        limit = util.get_limit()
-        core_pattern = "Core-Limit: {}\nCore-Remaining: {}\nCore-Reset: {}\n"
-        search_pattern = "Search-Limit: {}\nSearch-Remaining: {}\nSearch-Reset: {}\n"
-        return (core_pattern + search_pattern).format(
-            limit["core"]["limit"],
-            limit["core"]["remaining"],
-            limit["core"]["reset"],
-            limit["search"]["limit"],
-            limit["search"]["remaining"],
-            limit["search"]["reset"],
-        )
+    def list_branches(self, msg, args):
+        """
+        List all branches in current repository
+        :param msg:
+        :param args:
+        :return:
+        """
+        trans = self._translation_util(msg)
+        return "\n".join(trans.list_branches(REPOSITORY_NAME))
 
     @botcmd
     def refresh_repositories(self, msg, args):
@@ -346,14 +344,3 @@ class TransBot(BotPlugin):
             cmd.checkout(branch["value"])
             cmd.pull()
             yield ("{} had been updated.".format((branch["value"])))
-
-    # @arg_botcmd('repository', type=str)
-    # @arg_botcmd('--count', type=int, default=10)
-    # def list_release(self, msg, repository, count):
-    #     if not self._github_bound(msg.frm.person):
-    #         return "Bind your Github token please."
-    #     client = github.Github(self[msg.frm.person + "github_token"])
-    #     repo = client.get_repo(repository)
-    #     result = gitscan.get_release(repo, count)
-    #     for release in result:
-    #         yield ("{}: {}".format(release.title, release.html_url))

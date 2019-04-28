@@ -231,10 +231,15 @@ class GithubCondition(GithubOperator):
     def check_search(self, subject, search):
         var_processor = GithubVariable(self._token)
         repo = self.get_repo(subject["repo"])
-        issue_list = repo.get_issues(
+        issue_list = []
+        try:
+            issue_list = repo.get_issues(
             assignee=var_processor.parse_variable(subject, search["assignee"]),
             labels=[repo.get_label(search["label"])]
         )
+        except Exception as e:
+           logging.warning(e._GithubException__status)
+
         max_count = search["max"]
         count = 0
         for _ in issue_list:
